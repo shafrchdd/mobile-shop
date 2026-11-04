@@ -158,7 +158,7 @@ svg{width:19px;height:19px;stroke-width:1.8}
 .modal-actions{position:sticky;bottom:0;background:var(--surface);padding:13px 18px calc(13px + env(safe-area-inset-bottom));display:flex;justify-content:flex-end;gap:8px;border-top:1px solid var(--line)}
 .toast{position:fixed;left:50%;bottom:calc(82px + env(safe-area-inset-bottom));z-index:30;transform:translate(-50%,12px);background:#173d2e;color:#fff;padding:11px 16px;border-radius:12px;font-size:11px;font-weight:700;box-shadow:0 10px 25px rgba(0,0,0,.18);opacity:0;pointer-events:none;transition:.2s;max-width:calc(100% - 28px);text-align:center}
 .toast.show{opacity:1;transform:translate(-50%,0)}
-.install-dialog{width:min(420px,calc(100% - 24px));margin:auto 12px 88px auto;padding:20px;border:1px solid var(--line);border-radius:22px;background:var(--surface);color:var(--ink);box-shadow:0 22px 70px rgba(10,35,24,.24)}
+.install-dialog{width:min(420px,calc(100% - 24px));margin:auto auto 88px;padding:20px;border:1px solid var(--line);border-radius:22px;background:var(--surface);color:var(--ink);box-shadow:0 22px 70px rgba(10,35,24,.24)}
 .install-dialog::backdrop{background:rgba(13,35,26,.42);backdrop-filter:blur(3px)}
 .install-dialog[open]{animation:install-pop .22s ease-out}
 @keyframes install-pop{from{opacity:0;transform:translateY(14px) scale(.98)}to{opacity:1;transform:translateY(0) scale(1)}}
