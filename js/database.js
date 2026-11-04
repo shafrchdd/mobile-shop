@@ -419,24 +419,30 @@ export async function recordSupplierPayment({ supplierId, amountPaise, paymentMe
   if(!Number.isSafeInteger(amount)||amount<=0)throw new Error("Enter a valid payment amount.");
   const database=await db(),now=new Date().toISOString(),id=uid();
   return new Promise((resolve,reject)=>{
-    const stores=["suppliers","supplier_ledger_entries","supplier_payments","agent_collections"];
-    const tx=database.transaction([...stores,"payments"],"readwrite");
-    const req=tx.objectStore("suppliers").get(supplierId);
-    let result,failure=null;
-    req.onsuccess=()=>{
-      if(!req.result){failure=new Error("Supplier not found.");tx.abort();return;}
+    const stores=["suppliers","supplier_ledger_entries","supplier_payments","agent_collections","payments"];
+    const tx=database.transaction(stores,"readwrite");
+    const supplierReq=tx.objectStore("suppliers").get(supplierId);
+    const ledgerReq=tx.objectStore("supplier_ledger_entries").getAll();
+    let supplier=null,ledgerRows=null,sReady=false,lReady=false,result,failure=null;
+    const apply=()=>{
+      if(!sReady||!lReady||failure)return;
+      if(!supplier){failure=new Error("Supplier not found.");tx.abort();return;}
+      const outstanding=ledgerRows.filter(row=>row.supplierId===supplierId).reduce((sum,row)=>sum+Number(row.balanceDeltaPaise||0),0);
+      if(outstanding<=0){failure=new Error("This supplier has no outstanding balance to settle.");tx.abort();return;}
+      if(amount>outstanding){failure=new Error("Payment cannot exceed supplier outstanding of ₹"+(outstanding/100).toFixed(2)+".");tx.abort();return;}
       result={id,supplierId,amountPaise:amount,paymentMethod,agentId,note,createdAt:now};
       tx.objectStore("supplier_payments").add(result);
       tx.objectStore("supplier_ledger_entries").add({id:uid(),supplierId,entryType:"SUPPLIER_PAYMENT",amountPaise:amount,balanceDeltaPaise:-amount,referenceId:id,agentId,note:String(note||"Supplier payment"),createdAt:now});
-      if(agentId)tx.objectStore("agent_collections").add({id:uid(),supplierId,agentId,amountPaise:amount,paymentMethod,note,referenceId:id,createdAt:now});
+      if(agentId)tx.objectStore("agent_collections").add({id:uid(),supplierId,agentId,amountPaise:amount,paymentMethod,note,referenceId:id,collectionType:"SUPPLIER_SETTLEMENT",createdAt:now});
       tx.objectStore("payments").add({id,direction:"out",partyType:"supplier",partyId:supplierId,amountPaise:amount,paymentMethod,note,referenceId:id,createdAt:now});
     };
+    supplierReq.onsuccess=()=>{supplier=supplierReq.result;sReady=true;apply();};
+    ledgerReq.onsuccess=()=>{ledgerRows=ledgerReq.result||[];lReady=true;apply();};
     tx.oncomplete=()=>resolve(result);
     tx.onerror=()=>reject(failure||tx.error);
     tx.onabort=()=>reject(failure||tx.error||new Error("Payment could not be saved."));
   });
 }
-
 export async function recordPurchasePayment({ purchaseId, supplierId, amountPaise, paymentMethod="Cash", agentId=null, note="" }) {
   const amount=Math.round(Number(amountPaise));
   if(!Number.isSafeInteger(amount)||amount<=0)throw new Error("Enter a valid payment amount.");
