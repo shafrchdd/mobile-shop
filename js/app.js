@@ -592,7 +592,7 @@ async function renderRecharge() {
   const active=providers.filter(row=>row.active!==false);
   const walletMap=new Map(wallets.map(row=>[row.providerId||row.id,row]));
   const latest=transactions.slice().sort((a,b)=>String(b.createdAt).localeCompare(String(a.createdAt))).slice(0,12);
-  let html='<div class="page-intro"><div><h2>Quick recharge</h2><p>Choose provider and amount. Commission and wallet deduction are automatic.</p></div></div>';
+  let html='<div class="page-intro"><div><h2>Quick recharge</h2><p>Choose provider and amount. Commission and wallet deduction are automatic.</p></div>'+(active.length?'<button class="btn btn-primary" id="quickAddWallet">'+icon("wallet")+'<span class="desktop-only">Add wallet amount</span></button>':"")+'</div>';
   if(!active.length) {
     html+='<div class="card provider-empty"><span class="empty-icon">'+icon("wallet-cards")+'</span><h3>Set up recharge providers first</h3><p>Configure default commission and special amount-based rates in Settings. Those rules will be used every time you recharge.</p><button class="btn btn-primary" data-page="providers">'+icon("plus")+' Add provider</button></div>';
   } else {
@@ -604,12 +604,16 @@ async function renderRecharge() {
       '<div class="field"><label>Recharge amount (₹)</label><div class="amount-field"><span class="currency">₹</span><input id="rechargeAmount" type="number" inputmode="decimal" min="1" step="0.01" placeholder="0.00" required></div></div>'+
       '<div class="recharge-summary" id="rechargePreview"><div class="summary-line"><span>Commission earned</span><strong>—</strong></div><div class="summary-line"><span>Wallet deduction</span><strong>—</strong></div><div class="summary-line total"><span>Balance after recharge</span><strong>—</strong></div></div>'+
       '<button type="submit" class="btn btn-primary btn-block" id="rechargeSubmit">'+icon("check-circle")+' Record recharge</button><p class="recharge-submit-note">Wallet deduction = recharge amount − commission. Complete the actual recharge in your provider app.</p></form></section>';
-    html+='<aside class="stack"><section class="card"><h3 class="card-title">Provider wallets</h3><p class="card-subtitle">Opening and top-up balances are managed in Settings.</p><div class="wallet-mini-grid">'+active.map(p=>'<div class="wallet-mini"><small>'+safe(p.name)+'</small><strong>'+money(walletMap.get(p.id)?.balancePaise||0)+'</strong></div>').join("")+'</div><button class="btn btn-secondary btn-block" style="margin-top:12px" data-page="providers">'+icon("settings-2")+' Manage providers & rates</button></section></aside></div>';
+    html+='<aside class="stack"><section class="card"><h3 class="card-title">Provider wallets</h3><p class="card-subtitle">Add money here when the distributor credits your recharge app. The same amount is added to supplier outstanding.</p><div class="list-stack">'+active.map(p=>'<div class="list-row"><span class="list-avatar">'+icon("wallet")+'</span><div class="list-main"><b>'+safe(p.name)+'</b><small>Wallet balance</small></div><div class="list-value"><b>'+money(walletMap.get(p.id)?.balancePaise||0)+'</b><button class="btn btn-secondary btn-sm" type="button" data-recharge-topup="'+safe(p.id)+'" style="margin-top:6px">+ Add amount</button></div></div>').join("")+'</div><button class="btn btn-quiet btn-block" style="margin-top:12px" data-page="providers">'+icon("settings-2")+' Manage providers & commission</button></section></aside></div>';
   }
   html+=sectionHeading("Recent recharge transactions","Saved wallet debit and commission history");
   html+='<div class="record-list">'+(latest.length?latest.map(row=>recordCard(row.providerName,(row.serviceType||"service").toUpperCase()+(row.recipient?" · "+row.recipient:""),money(row.amountPaise),money(row.commissionPaise)+" commission · Wallet −"+money(row.walletDebitPaise),"smartphone")).join(""):emptyState("No recharge transactions recorded yet."))+'</div>';
   $("#view").innerHTML=html;bindPageActions();
-  if(active.length)bindRecharge(active,walletMap);
+  if(active.length){
+    bindRecharge(active,walletMap);
+    $("#quickAddWallet").onclick=()=>openRechargeWalletChooser(active);
+    document.querySelectorAll("[data-recharge-topup]").forEach(button=>button.onclick=()=>openTopup(button.dataset.rechargeTopup,active.find(row=>row.id===button.dataset.rechargeTopup)));
+  }
   refreshIcons();
 }
 function bindRecharge(active,walletMap) {
@@ -710,19 +714,38 @@ function openProviderEditor(provider=null) {
     draw();
   })().catch(error=>toast(error.message));
 }
+async function openRechargeWalletChooser(providers) {
+  const body='<div class="field"><label>Recharge provider</label><select id="walletProvider">'+providers.map(provider=>'<option value="'+safe(provider.id)+'">'+safe(provider.name)+'</option>').join("")+'</select></div><p class="inline-note">Choose which recharge app received the balance credit. The full top-up will be added to the linked distributor supplier outstanding.</p>';
+  showModal("Add recharge wallet amount",body,async()=>{
+    const provider=providers.find(row=>row.id===$("#walletProvider").value);
+    if(!provider)throw Error("Select a recharge provider.");
+    closeModal();
+    await openTopup(provider.id,provider);
+  },"RECHARGE WALLET","Continue");
+}
 async function openTopup(providerId,provider) {
   const suppliers=(await all("suppliers")).filter(row=>row.supplierType==="recharge_distributor");
-  const body='<p class="inline-note">Credit the amount added to the external recharge app. The full amount is recorded as a supplier payable when a distributor is linked. Agent collection is recorded later when the agent visits, even if wallet balance remains.</p>'+
-    '<div class="field"><label>Amount credited to recharge wallet (₹)</label><input id="topupAmount" type="number" min="0.01" step="0.01" placeholder="3000.00"></div>'+
-    '<div class="field"><label>Distributor supplier</label><select id="topupSupplier"><option value="">Use provider linked supplier</option>'+suppliers.map(s=>'<option value="'+safe(s.id)+'">'+safe(s.name)+'</option>').join("")+'</select></div>'+
+  if(!suppliers.length) {
+    showModal("Recharge distributor required",
+      '<div class="provider-empty"><span class="empty-icon">'+icon("store")+'</span><h3>Add a recharge distributor first</h3><p>Wallet credits must be linked to a recharge distributor so the amount appears in supplier outstanding and can be settled through its collection agent.</p></div>',
+      async()=>{closeModal();await go("suppliers");},"SUPPLIER SETUP","Open suppliers");
+    return;
+  }
+  const defaultSupplierId=provider.supplierId||"";
+  const body='<p class="inline-note">Enter the full amount credited to the external recharge app. This increases the provider wallet and creates the same amount as supplier outstanding. Later, record the amount paid to the distributor or collection agent in Supplier collections.</p>'+
+    '<div class="field"><label>Amount credited to recharge wallet (₹) *</label><input id="topupAmount" type="number" inputmode="decimal" min="0.01" step="0.01" placeholder="3000.00"></div>'+
+    '<div class="field"><label>Recharge distributor supplier *</label><select id="topupSupplier" required><option value="">Select distributor supplier</option>'+suppliers.map(s=>'<option value="'+safe(s.id)+'">'+safe(s.name)+'</option>').join("")+'</select><span class="field-hint">This supplier’s outstanding balance will increase by the full wallet credit.</span></div>'+
     '<div class="field"><label>Reference / note (optional)</label><input id="topupNote" placeholder="Agent credit / transaction reference"></div>';
   showModal("Add wallet balance",body,async()=>{
-    const amount=toPaise($("#topupAmount").value);if(amount<=0)throw Error("Enter a valid top-up amount.");
-    const supplierId=$("#topupSupplier").value||provider.supplierId||null;
+    const amount=toPaise($("#topupAmount").value),supplierId=$("#topupSupplier").value;
+    if(amount<=0)throw Error("Enter a valid top-up amount.");
+    if(!supplierId)throw Error("Select the recharge distributor. Without this, supplier outstanding cannot be tracked.");
     await topupRechargeWallet({providerId,amountPaise:amount,supplierId,note:$("#topupNote").value.trim()});
-    closeModal();toast("Wallet credited. Supplier payable increased separately.");await renderProviders();
+    closeModal();
+    toast("Wallet +"+money(amount)+" · Supplier outstanding +"+money(amount));
+    if(current==="recharge")await renderRecharge();else await renderProviders();
   },"PROVIDER WALLET","Credit wallet");
-  $("#topupSupplier").value=provider.supplierId||"";
+  $("#topupSupplier").value=defaultSupplierId;
 }
 
 /* ---------------- REPAIR WORKFLOW ---------------- */
