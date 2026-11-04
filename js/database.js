@@ -347,7 +347,11 @@ export async function recordPurchase({ supplierId=null, purchaseType="line_suppl
           tx.objectStore("stock_movements").add({id:uid(),productId,productName:product.name,movementType:"PURCHASE",quantityDelta:item.quantity,balanceAfter:newQty,referenceId:id,note:"Purchase stock received",createdAt:now});
         };
       });
-      payments.forEach(payment=>tx.objectStore("purchase_payments").add({id:uid(),purchaseId:id,supplierId,amountPaise:Math.round(Number(payment.amountPaise||0)),paymentMethod:payment.paymentMethod||"Cash",note:payment.note||"",createdAt:now}));
+      payments.forEach(payment=>{
+        const paymentId=uid(),amount=Math.round(Number(payment.amountPaise||0));
+        tx.objectStore("purchase_payments").add({id:paymentId,purchaseId:id,supplierId,amountPaise:amount,paymentMethod:payment.paymentMethod||"Cash",note:payment.note||"",createdAt:now});
+        tx.objectStore("payments").add({id:paymentId,direction:"out",partyType:"supplier",partyId:supplierId,referenceId:id,amountPaise:amount,paymentMethod:payment.paymentMethod||"Cash",note:"Purchase payment",createdAt:now});
+      });
       if(supplierId&&totalPaise)tx.objectStore("supplier_ledger_entries").add({id:uid(),supplierId,entryType:"PURCHASE_BILL",amountPaise:totalPaise,balanceDeltaPaise:totalPaise,referenceId:id,note:"Purchase "+(purchase.invoiceNumber||""),createdAt:now});
       if(supplierId&&paymentTotal)tx.objectStore("supplier_ledger_entries").add({id:uid(),supplierId,entryType:"PURCHASE_PAYMENT",amountPaise:paymentTotal,balanceDeltaPaise:-paymentTotal,referenceId:id,note:"Payment at purchase",createdAt:now});
     };
@@ -403,7 +407,7 @@ export async function recordSupplierPayment({ supplierId, amountPaise, paymentMe
   const database=await db(),now=new Date().toISOString(),id=uid();
   return new Promise((resolve,reject)=>{
     const stores=["suppliers","supplier_ledger_entries","supplier_payments","agent_collections"];
-    const tx=database.transaction(stores,"readwrite");
+    const tx=database.transaction([...stores,"payments"],"readwrite");
     const req=tx.objectStore("suppliers").get(supplierId);
     let result,failure=null;
     req.onsuccess=()=>{
@@ -412,6 +416,7 @@ export async function recordSupplierPayment({ supplierId, amountPaise, paymentMe
       tx.objectStore("supplier_payments").add(result);
       tx.objectStore("supplier_ledger_entries").add({id:uid(),supplierId,entryType:"SUPPLIER_PAYMENT",amountPaise:amount,balanceDeltaPaise:-amount,referenceId:id,agentId,note:String(note||"Supplier payment"),createdAt:now});
       if(agentId)tx.objectStore("agent_collections").add({id:uid(),supplierId,agentId,amountPaise:amount,paymentMethod,note,referenceId:id,createdAt:now});
+      tx.objectStore("payments").add({id,direction:"out",partyType:"supplier",partyId:supplierId,amountPaise:amount,paymentMethod,note,referenceId:id,createdAt:now});
     };
     tx.oncomplete=()=>resolve(result);
     tx.onerror=()=>reject(failure||tx.error);
@@ -424,7 +429,7 @@ export async function recordPurchasePayment({ purchaseId, supplierId, amountPais
   if(!Number.isSafeInteger(amount)||amount<=0)throw new Error("Enter a valid payment amount.");
   const database=await db(),now=new Date().toISOString(),id=uid();
   return new Promise((resolve,reject)=>{
-    const tx=database.transaction(["purchases","purchase_payments","supplier_ledger_entries","agent_collections"],"readwrite");
+    const tx=database.transaction(["purchases","purchase_payments","supplier_ledger_entries","agent_collections","payments"],"readwrite");
     const req=tx.objectStore("purchases").get(purchaseId);let result,failure=null;
     req.onsuccess=()=>{
       const purchase=req.result;
@@ -440,6 +445,7 @@ export async function recordPurchasePayment({ purchaseId, supplierId, amountPais
       tx.objectStore("purchase_payments").add(result);
       if(result.supplierId)tx.objectStore("supplier_ledger_entries").add({id:uid(),supplierId:result.supplierId,entryType:"PURCHASE_PAYMENT",amountPaise:amount,balanceDeltaPaise:-amount,referenceId:purchaseId,agentId,note,createdAt:now});
       if(agentId)tx.objectStore("agent_collections").add({id:uid(),supplierId:result.supplierId,agentId,amountPaise:amount,paymentMethod,note,referenceId:purchaseId,createdAt:now});
+      tx.objectStore("payments").add({id,direction:"out",partyType:"supplier",partyId:result.supplierId,amountPaise:amount,paymentMethod,note,referenceId:purchaseId,createdAt:now});
     };
     tx.oncomplete=()=>resolve(result);
     tx.onerror=()=>reject(failure||tx.error);
