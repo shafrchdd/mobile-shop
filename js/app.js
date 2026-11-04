@@ -276,6 +276,8 @@ function bindRechargeForm(active, walletMap) {
       previewRecharge(active, walletMap);
     }
   };
+  const selectedService = document.querySelector('[data-service="' + rechargeService + '"]');
+  if (selectedService) selectedService.click();
   previewRecharge(active, walletMap);
 }
 
