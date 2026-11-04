@@ -414,6 +414,34 @@ export async function recordSupplierPayment({ supplierId, amountPaise, paymentMe
   });
 }
 
+export async function recordPurchasePayment({ purchaseId, supplierId, amountPaise, paymentMethod="Cash", agentId=null, note="" }) {
+  const amount=Math.round(Number(amountPaise));
+  if(!Number.isSafeInteger(amount)||amount<=0)throw new Error("Enter a valid payment amount.");
+  const database=await db(),now=new Date().toISOString(),id=uid();
+  return new Promise((resolve,reject)=>{
+    const tx=database.transaction(["purchases","purchase_payments","supplier_ledger_entries","agent_collections"],"readwrite");
+    const req=tx.objectStore("purchases").get(purchaseId);let result,failure=null;
+    req.onsuccess=()=>{
+      const purchase=req.result;
+      if(!purchase){failure=new Error("Purchase invoice not found.");tx.abort();return;}
+      const due=Math.max(0,Number(purchase.duePaise||0));
+      if(amount>due){failure=new Error("Payment is higher than the invoice outstanding amount.");tx.abort();return;}
+      result={id,purchaseId,supplierId:supplierId||purchase.supplierId||null,amountPaise:amount,paymentMethod,agentId,note,createdAt:now};
+      purchase.paidPaise=Number(purchase.paidPaise||0)+amount;
+      purchase.duePaise=Math.max(0,Number(purchase.totalPaise||0)-purchase.paidPaise);
+      purchase.status=purchase.duePaise===0?"paid":"partial";
+      purchase.updatedAt=now;
+      tx.objectStore("purchases").put(purchase);
+      tx.objectStore("purchase_payments").add(result);
+      if(result.supplierId)tx.objectStore("supplier_ledger_entries").add({id:uid(),supplierId:result.supplierId,entryType:"PURCHASE_PAYMENT",amountPaise:amount,balanceDeltaPaise:-amount,referenceId:purchaseId,agentId,note,createdAt:now});
+      if(agentId)tx.objectStore("agent_collections").add({id:uid(),supplierId:result.supplierId,agentId,amountPaise:amount,paymentMethod,note,referenceId:purchaseId,createdAt:now});
+    };
+    tx.oncomplete=()=>resolve(result);
+    tx.onerror=()=>reject(failure||tx.error);
+    tx.onabort=()=>reject(failure||tx.error||new Error("Purchase payment failed."));
+  });
+}
+
 export async function recordCustomerPayment({ customerId, amountPaise, paymentMethod="Cash", note="" }) {
   const amount=Math.round(Number(amountPaise));
   if(!Number.isSafeInteger(amount)||amount<=0)throw new Error("Enter a valid payment amount.");
