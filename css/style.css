@@ -158,6 +158,20 @@ svg{width:19px;height:19px;stroke-width:1.8}
 .modal-actions{position:sticky;bottom:0;background:var(--surface);padding:13px 18px calc(13px + env(safe-area-inset-bottom));display:flex;justify-content:flex-end;gap:8px;border-top:1px solid var(--line)}
 .toast{position:fixed;left:50%;bottom:calc(82px + env(safe-area-inset-bottom));z-index:30;transform:translate(-50%,12px);background:#173d2e;color:#fff;padding:11px 16px;border-radius:12px;font-size:11px;font-weight:700;box-shadow:0 10px 25px rgba(0,0,0,.18);opacity:0;pointer-events:none;transition:.2s;max-width:calc(100% - 28px);text-align:center}
 .toast.show{opacity:1;transform:translate(-50%,0)}
+.install-dialog{width:min(420px,calc(100% - 24px));margin:auto 12px 88px auto;padding:20px;border:1px solid var(--line);border-radius:22px;background:var(--surface);color:var(--ink);box-shadow:0 22px 70px rgba(10,35,24,.24)}
+.install-dialog::backdrop{background:rgba(13,35,26,.42);backdrop-filter:blur(3px)}
+.install-dialog[open]{animation:install-pop .22s ease-out}
+@keyframes install-pop{from{opacity:0;transform:translateY(14px) scale(.98)}to{opacity:1;transform:translateY(0) scale(1)}}
+.install-dialog-top{display:flex;align-items:center;justify-content:space-between}
+.install-dialog-icon{width:50px;height:50px;border-radius:16px;display:grid;place-items:center;background:var(--green-soft);color:var(--green)}
+.install-dialog-icon svg{width:25px;height:25px}
+.install-dialog-copy{padding:17px 0 20px}
+.install-dialog-kicker{font-size:9px;font-weight:850;letter-spacing:1.05px;color:var(--green);margin-bottom:7px}
+.install-dialog-copy h2{font-size:19px;letter-spacing:-.55px;margin:0 0 8px}
+.install-dialog-copy p{font-size:12px;line-height:1.65;color:var(--muted);margin:0}
+.install-dialog-actions{display:flex;gap:9px}
+.install-dialog-actions .btn{flex:1}
+
 .mobile-nav{position:fixed;z-index:10;left:0;right:0;bottom:0;min-height:67px;padding:7px 5px calc(7px + env(safe-area-inset-bottom));background:rgba(255,255,255,.96);backdrop-filter:blur(18px);border-top:1px solid var(--line);display:grid;grid-template-columns:repeat(5,1fr)}
 .mobile-nav button{border:0;background:transparent;color:#7b8981;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;min-width:0;font-size:9px;font-weight:700}
 .mobile-nav button svg{width:19px;height:19px}
