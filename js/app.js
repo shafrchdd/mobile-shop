@@ -273,7 +273,7 @@ async function renderCustomers() {
   $("#view").innerHTML=html;
   $("#addCustomer").onclick=()=>openCustomerEditor();
   $("#customerSearch").oninput=event=>{const q=event.target.value.toLowerCase();const filtered=rows.filter(row=>(row.name+" "+row.phone).toLowerCase().includes(q));$("#customerList").innerHTML=filtered.map(customer=>'<article class="record-card"><span class="list-avatar">'+icon("user-round")+'</span><div class="record-info"><b>'+safe(customer.name)+'</b><small>'+safe(customer.phone||"No phone")+'</small></div><div class="record-end">'+money(customer.balancePaise)+'<small>Outstanding</small></div>'+(customer.phone?'<a class="icon-btn" href="tel:'+safe(customer.phone)+'">'+icon("phone")+'</a>':"")+(customer.balancePaise>0?'<button class="btn btn-secondary btn-sm" data-customer-pay="'+safe(customer.id)+'">Collect</button>':"")+'<button class="icon-btn" data-customer-edit="'+safe(customer.id)+'">'+icon("pencil")+'</button></article>').join("")||emptyState("No matching customers.");bindCustomerEdit();bindCustomerPayments();refreshIcons();};
-  bindCustomerEdit();refreshIcons();
+  bindCustomerEdit();bindCustomerPayments();refreshIcons();
 }
 function bindCustomerEdit(){document.querySelectorAll("[data-customer-edit]").forEach(button=>button.onclick=async()=>{const row=(await all("customers")).find(item=>item.id===button.dataset.customerEdit);openCustomerEditor(row);});}
 async function bindCustomerPayments(){
