@@ -269,13 +269,31 @@ async function renderCustomers() {
     return {...customer,balancePaise:balance};
   }).sort((a,b)=>String(a.name).localeCompare(String(b.name)));
   let html='<div class="page-intro"><div><h2>Customers</h2><p>Sales, repairs and recharges can use the same saved customer contact.</p></div><button class="btn btn-primary" id="addCustomer">'+icon("user-plus")+'<span class="desktop-only">Add customer</span></button></div>';
-  html+='<div class="search-wrap">'+icon("search")+'<input id="customerSearch" type="search" placeholder="Search customer name or phone"></div><div class="record-list" id="customerList">'+(rows.length?rows.map(customer=>'<article class="record-card"><span class="list-avatar">'+icon("user-round")+'</span><div class="record-info"><b>'+safe(customer.name)+'</b><small>'+safe(customer.phone||"No phone")+'</small></div><div class="record-end">'+money(customer.balancePaise)+'<small>Outstanding</small></div>'+(customer.phone?'<a class="icon-btn" href="tel:'+safe(customer.phone)+'" aria-label="Call customer">'+icon("phone")+'</a>':"")+'<button class="icon-btn" type="button" data-customer-edit="'+safe(customer.id)+'" aria-label="Edit customer">'+icon("pencil")+'</button></article>').join(""):emptyState("No customers yet. They can also be created automatically from sales and repairs."))+'</div>';
+  html+='<div class="search-wrap">'+icon("search")+'<input id="customerSearch" type="search" placeholder="Search customer name or phone"></div><div class="record-list" id="customerList">'+(rows.length?rows.map(customer=>'<article class="record-card"><span class="list-avatar">'+icon("user-round")+'</span><div class="record-info"><b>'+safe(customer.name)+'</b><small>'+safe(customer.phone||"No phone")+'</small></div><div class="record-end">'+money(customer.balancePaise)+'<small>Outstanding</small></div>'+(customer.phone?'<a class="icon-btn" href="tel:'+safe(customer.phone)+'" aria-label="Call customer">'+icon("phone")+'</a>':"")+(customer.balancePaise>0?'<button class="btn btn-secondary btn-sm" type="button" data-customer-pay="'+safe(customer.id)+'">Collect</button>':"")+'<button class="icon-btn" type="button" data-customer-edit="'+safe(customer.id)+'" aria-label="Edit customer">'+icon("pencil")+'</button></article>').join(""):emptyState("No customers yet. They can also be created automatically from sales and repairs."))+'</div>';
   $("#view").innerHTML=html;
   $("#addCustomer").onclick=()=>openCustomerEditor();
-  $("#customerSearch").oninput=event=>{const q=event.target.value.toLowerCase();const filtered=rows.filter(row=>(row.name+" "+row.phone).toLowerCase().includes(q));$("#customerList").innerHTML=filtered.map(customer=>'<article class="record-card"><span class="list-avatar">'+icon("user-round")+'</span><div class="record-info"><b>'+safe(customer.name)+'</b><small>'+safe(customer.phone||"No phone")+'</small></div><div class="record-end">'+money(customer.balancePaise)+'<small>Outstanding</small></div>'+(customer.phone?'<a class="icon-btn" href="tel:'+safe(customer.phone)+'">'+icon("phone")+'</a>':"")+'<button class="icon-btn" data-customer-edit="'+safe(customer.id)+'">'+icon("pencil")+'</button></article>').join("")||emptyState("No matching customers.");bindCustomerEdit();refreshIcons();};
+  $("#customerSearch").oninput=event=>{const q=event.target.value.toLowerCase();const filtered=rows.filter(row=>(row.name+" "+row.phone).toLowerCase().includes(q));$("#customerList").innerHTML=filtered.map(customer=>'<article class="record-card"><span class="list-avatar">'+icon("user-round")+'</span><div class="record-info"><b>'+safe(customer.name)+'</b><small>'+safe(customer.phone||"No phone")+'</small></div><div class="record-end">'+money(customer.balancePaise)+'<small>Outstanding</small></div>'+(customer.phone?'<a class="icon-btn" href="tel:'+safe(customer.phone)+'">'+icon("phone")+'</a>':"")+(customer.balancePaise>0?'<button class="btn btn-secondary btn-sm" data-customer-pay="'+safe(customer.id)+'">Collect</button>':"")+'<button class="icon-btn" data-customer-edit="'+safe(customer.id)+'">'+icon("pencil")+'</button></article>').join("")||emptyState("No matching customers.");bindCustomerEdit();bindCustomerPayments();refreshIcons();};
   bindCustomerEdit();refreshIcons();
 }
 function bindCustomerEdit(){document.querySelectorAll("[data-customer-edit]").forEach(button=>button.onclick=async()=>{const row=(await all("customers")).find(item=>item.id===button.dataset.customerEdit);openCustomerEditor(row);});}
+async function bindCustomerPayments(){
+  document.querySelectorAll("[data-customer-pay]").forEach(button=>button.onclick=async()=>{
+    const [customer,ledger]=await Promise.all([all("customers"),all("customer_ledger_entries")]);
+    const row=customer.find(item=>item.id===button.dataset.customerPay);
+    if(!row)return;
+    const balance=ledger.filter(entry=>entry.customerId===row.id).reduce((sum,entry)=>sum+Number(entry.balanceDeltaPaise||0),0);
+    openCustomerPayment(row,balance);
+  });
+}
+function openCustomerPayment(customer,balance){
+  const body='<p class="inline-note">Outstanding balance for <b>'+safe(customer.name)+'</b>: '+money(balance)+'</p><div class="field"><label>Amount received (₹)</label><input id="customerPayAmount" type="number" min="0.01" max="'+(balance/100)+'" step="0.01" value="'+(balance/100).toFixed(2)+'"></div><div class="field"><label>Payment method</label><select id="customerPayMethod"><option>Cash</option><option>UPI</option><option>Bank</option><option>Card</option></select></div>';
+  showModal("Customer payment",body,async()=>{
+    const amount=toPaise($("#customerPayAmount").value);
+    if(amount<=0||amount>balance)throw Error("Payment must be within the customer outstanding balance.");
+    await recordCustomerPayment({customerId:customer.id,amountPaise:amount,paymentMethod:$("#customerPayMethod").value});
+    closeModal();toast("Customer payment received.");await renderCustomers();
+  },"CUSTOMER COLLECTION");
+}
 function openCustomerEditor(customer=null) {
   const body='<div class="field"><label>Customer name *</label><input id="custName" value="'+safe(customer?.name||"")+'" required></div><div class="field"><label>Mobile number</label><input id="custPhone" type="tel" inputmode="numeric" maxlength="10" value="'+safe(customer?.phone||"")+'"></div><div class="field"><label>Address / place</label><textarea id="custAddress">'+safe(customer?.address||"")+'</textarea></div>';
   showModal(customer?"Edit customer":"Add customer",body,async()=>{
