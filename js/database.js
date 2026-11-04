@@ -325,7 +325,7 @@ export async function recordPurchase({ supplierId=null, purchaseType="line_suppl
   const paymentTotal=payments.reduce((sum,p)=>sum+Math.round(Number(p.amountPaise||0)),0);
   if(paymentTotal>totalPaise) throw new Error("Payments cannot exceed the purchase total.");
   return new Promise((resolve,reject)=>{
-    const tx=database.transaction(["products","purchases","purchase_items","purchase_payments","stock_movements","supplier_ledger_entries"],"readwrite");
+    const tx=database.transaction(["products","purchases","purchase_items","purchase_payments","stock_movements","supplier_ledger_entries","payments"],"readwrite");
     const products=tx.objectStore("products"),purchase={id,supplierId,purchaseType,invoiceNumber:String(invoiceNumber||"").trim(),totalPaise,paidPaise:paymentTotal,duePaise:totalPaise-paymentTotal,status:paymentTotal>=totalPaise?"paid":paymentTotal>0?"partial":"unpaid",note,createdAt:now};
     let pending=normalized.length,failure=null;
     const finishIfReady=()=>{
