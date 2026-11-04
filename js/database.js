@@ -234,40 +234,49 @@ export async function topupRechargeWallet({ providerId, amountPaise, supplierId 
   const amount = Math.round(Number(amountPaise));
   if (!Number.isSafeInteger(amount) || amount <= 0) throw new Error("Enter a valid wallet credit amount.");
   return new Promise((resolve, reject) => {
-    const stores = ["recharge_platforms","recharge_wallets","recharge_wallet_transactions","recharge_topups","supplier_ledger_entries"];
+    const stores = ["recharge_platforms","recharge_wallets","recharge_wallet_transactions","recharge_topups","supplier_ledger_entries","suppliers"];
     const tx = database.transaction(stores, "readwrite");
     const providerReq = tx.objectStore("recharge_platforms").get(providerId);
     const walletReq = tx.objectStore("recharge_wallets").get(providerId);
-    let provider, wallet, pReady=false, wReady=false, result, failure=null;
+    let provider, wallet, supplier, pReady=false, wReady=false, sReady=false, result, failure=null;
     const apply = () => {
-      if (!pReady || !wReady || failure) return;
+      if (!pReady || !wReady || !sReady || failure) return;
       if (!provider || !wallet) { failure = new Error("Provider wallet not found."); tx.abort(); return; }
+      if (!supplierId) { failure = new Error("Select the recharge distributor supplier. Wallet credits must appear in supplier outstanding."); tx.abort(); return; }
+      if (!supplier || supplier.supplierType !== "recharge_distributor") {
+        failure = new Error("Choose a supplier marked as Recharge distributor.");
+        tx.abort();
+        return;
+      }
       const now = new Date().toISOString();
       const before = Number(wallet.balancePaise || 0);
       wallet.balancePaise = before + amount;
       wallet.updatedAt = now;
       tx.objectStore("recharge_wallets").put(wallet);
       result = {
-        id: uid(), providerId, providerName: provider.name, supplierId: supplierId || provider.supplierId || null,
+        id: uid(), providerId, providerName: provider.name, supplierId,
         entryType:"CREDIT", amountPaise:amount, balanceBeforePaise:before,
         balanceAfterPaise:before+amount, note:String(note || "").trim(), createdAt:now
       };
       tx.objectStore("recharge_wallet_transactions").add(result);
       tx.objectStore("recharge_topups").add({ ...result, id: uid() });
-      if (result.supplierId) tx.objectStore("supplier_ledger_entries").add({
-        id:uid(), supplierId:result.supplierId, entryType:"RECHARGE_WALLET_CREDIT",
+      // The whole credit becomes payable to the distributor. It is not reduced by recharge usage.
+      tx.objectStore("supplier_ledger_entries").add({
+        id:uid(), supplierId, entryType:"RECHARGE_WALLET_CREDIT",
         amountPaise:amount, balanceDeltaPaise:amount, referenceId:result.id,
         note:"Recharge wallet funded: " + provider.name, createdAt:now
       });
     };
     providerReq.onsuccess=()=>{provider=providerReq.result;pReady=true;apply();};
     walletReq.onsuccess=()=>{wallet=walletReq.result;wReady=true;apply();};
+    const actualSupplierId = supplierId;
+    const supplierReq = tx.objectStore("suppliers").get(actualSupplierId);
+    supplierReq.onsuccess=()=>{supplier=supplierReq.result;sReady=true;apply();};
     tx.oncomplete=()=>resolve(result);
     tx.onerror=()=>reject(failure || tx.error);
     tx.onabort=()=>reject(failure || tx.error || new Error("Wallet credit failed."));
   });
 }
-
 export async function completeRecharge({ providerId, serviceType, recipient="", customerId=null, amountPaise }) {
   const database = await db();
   const amount = Math.round(Number(amountPaise));
