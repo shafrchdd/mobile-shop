@@ -1020,7 +1020,7 @@ function closeInstallDialog(snooze=true) {
   if(snooze) localStorage.setItem("mobile-shop-install-dismissed-until",String(Date.now()+7*24*60*60*1000));
 }
 async function handleInstallAction() {
-  if(!installPrompt) { closeInstallDialog(false); return; }
+  if(!installPrompt) { closeInstallDialog(true); return; }
   const promptEvent=installPrompt;
   installPrompt=null;
   try {
