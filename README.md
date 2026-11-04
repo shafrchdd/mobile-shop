@@ -4,7 +4,8 @@ Mobile-first, offline-first PWA for Kerala mobile shops. Built with HTML, CSS, v
 
 ## Implemented workflows
 - Mobile-first navigation: Home, Sell, Recharge, Repairs and More; desktop sidebar on wide screens.
-- Product catalogue with product type, category, purchase cost, selling price, stock quantity, low-stock threshold and repair markup.
+- Product catalogue with product type, category, purchase cost, automatic selling price from fixed or percentage markup, stock quantity, low-stock threshold and separate repair markup.
+- Sale price recalculates from the saved per-product markup whenever a new purchase changes its weighted-average cost.
 - Purchase receiving with product selection, supplier, line-supply/direct-market type, partial payment and stock update.
 - POS sales from the same product catalogue; sale reduces stock and records customer credit when an amount is due.
 - Customer lookup by phone in sales and repair intake; existing contacts are linked, new contacts can be saved.
