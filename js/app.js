@@ -228,7 +228,7 @@ function openProductEditor(product=null) {
     ? (Number(product.pricePaise || 0) - Number(product.costPaise || 0)) / 100
     : 0;
   const p=product||{productType:"accessory",qty:0,minStock:2,repairMarginType:"fixed",repairMarginValue:0,saleMarginType:"percentage",saleMarginValue:0};
-  const saleMarginType=product?.saleMarginType||"fixed";
+  const saleMarginType=product?.saleMarginType||p.saleMarginType||"percentage";
   const saleMarginValue=product?.saleMarginValue ?? legacyMargin;
   const types=productTypes.map(row=>'<option value="'+row[0]+'">'+row[1]+'</option>').join("");
   const body='<div class="form-grid two"><div class="field"><label>Product type</label><select id="pType">'+types+'</select></div><div class="field"><label>Category</label><input id="pCategory" value="'+safe(p.category||"General")+'" placeholder="e.g. Chargers"></div></div>'+
