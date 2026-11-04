@@ -506,7 +506,7 @@ async function renderAgents() {
   html+='<div class="record-list">'+(agents.length?agents.map(agent=>{
     const assigned=links.filter(link=>link.agentId===agent.id).length;
     const total=collections.filter(row=>row.agentId===agent.id).reduce((sum,row)=>sum+Number(row.amountPaise||0),0);
-    return '<article class="record-card"><span class="list-avatar">'+icon("user-round")+'</span><div class="record-info"><b>'+safe(agent.name)+'</b><small>'+safe(agent.phone||"No phone")+' · '+assigned+' supplier links</small></div><div class="record-end">'+money(total)+'<small>Collections recorded</small></div><button class="icon-btn" data-edit-agent="'+safe(agent.id)+'">'+icon("pencil")+'</button></article>';
+    return '<article class="record-card"><span class="list-avatar">'+icon("user-round")+'</span><div class="record-info"><b>'+safe(agent.name)+'</b><small>'+safe(agent.phone||"No phone")+' · '+assigned+' supplier links</small></div><div class="record-end">'+money(total)+'<small>Supplier payments handled</small></div><button class="icon-btn" data-edit-agent="'+safe(agent.id)+'">'+icon("pencil")+'</button></article>';
   }).join(""):emptyState("No collection agents added. Add agents here, then assign them to suppliers."))+'</div>';
   $("#view").innerHTML=html;$("#addAgent").onclick=()=>openAgentEditor();
   document.querySelectorAll("[data-edit-agent]").forEach(button=>button.onclick=()=>openAgentEditor(agents.find(row=>row.id===button.dataset.editAgent)));
@@ -655,7 +655,7 @@ function bindRecharge(active,walletMap) {
 /* Provider settings: one default rule plus exact amount / amount range overrides. */
 async function renderProviders() {
   setTitle("Recharge providers");
-  const [providers,wallets,suppliers,transactions]=await Promise.all([all("recharge_platforms"),all("recharge_wallets"),all("suppliers"),all("recharge_wallet_transactions")]);
+  const [providers,wallets,suppliers,transactions,supplierLedger]=await Promise.all([all("recharge_platforms"),all("recharge_wallets"),all("suppliers"),all("recharge_wallet_transactions"),all("supplier_ledger_entries")]);
   const walletMap=new Map(wallets.map(row=>[row.providerId||row.id,row]));
   const rechargeSuppliers=suppliers.filter(row=>row.supplierType==="recharge_distributor");
   const pendingTopups=transactions.filter(row=>row.entryType==="CREDIT"&&row.supplierId);
@@ -664,6 +664,7 @@ async function renderProviders() {
   if(!providers.length)html+='<div class="card provider-empty"><span class="empty-icon">'+icon("radio-tower")+'</span><h3>No recharge providers</h3><p>Add a recharge app or distributor, choose the linked supplier and configure its commission.</p><button class="btn btn-primary" id="addProviderEmpty">Add first provider</button></div>';
   html+='<div class="settings-grid">'+providers.map(provider=>{
     const wallet=walletMap.get(provider.id),supplier=rechargeSuppliers.find(s=>s.id===provider.supplierId);
+    const supplierDue=supplier?supplierLedger.filter(row=>row.supplierId===supplier.id).reduce((sum,row)=>sum+Number(row.balanceDeltaPaise||0),0):null;
     const overrides=(provider.amountRules||[]).length;
     return '<article class="card provider-card"><div class="provider-top"><span class="provider-logo">'+icon("radio-tower")+'</span><div class="provider-info"><h3>'+safe(provider.name)+'</h3><p>'+pill(provider.active===false?"Inactive":"Active",provider.active===false?"danger":"")+'</p></div></div><div class="provider-balance">'+money(wallet?.balancePaise||0)+'</div><div class="provider-meta">Default: '+safe(provider.commissionType==="fixed"?rupees(provider.commissionValue)+" per recharge":provider.commissionValue+"% commission")+'<br>'+overrides+' amount-specific override(s)<br>Supplier: '+safe(supplier?.name||"Not linked")+'<br>Wallet debit is always recharge amount − commission.</div><div class="provider-actions"><button class="btn btn-secondary btn-sm" data-topup="'+safe(provider.id)+'">'+icon("plus-circle")+' Add balance</button><button class="btn btn-quiet btn-sm" data-edit-provider="'+safe(provider.id)+'">'+icon("pencil")+' Edit rates</button></div></article>';
   }).join("")+'</div>';
