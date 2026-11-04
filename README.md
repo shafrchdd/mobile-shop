@@ -1,23 +1,35 @@
 # Mobile Shop ERP
 
-Offline-first PWA foundation for Kerala mobile shops.
+Mobile-first, offline-first PWA for Kerala mobile shops. Built with HTML, CSS, vanilla JavaScript and IndexedDB.
 
-## Current foundation
-- Responsive mobile/desktop shell and navigation
-- IndexedDB database and initial store schema
-- Local JSON export and restore
-- Installable PWA manifest and service worker
-- Starter screens for sales, recharge, inventory, customers, repairs, purchases, expenses, money and settings
+## Implemented workflows
+- Mobile-first navigation: Home, Sell, Recharge, Repairs and More; desktop sidebar on wide screens.
+- Product catalogue with product type, category, purchase cost, selling price, stock quantity, low-stock threshold and repair markup.
+- Purchase receiving with product selection, supplier, line-supply/direct-market type, partial payment and stock update.
+- POS sales from the same product catalogue; sale reduces stock and records customer credit when an amount is due.
+- Customer lookup by phone in sales and repair intake; existing contacts are linked, new contacts can be saved.
+- Recharge providers with a default commission plus exact-amount/range overrides.
+- Recharge wallet top-ups and recharge transactions; wallet debit is always recharge amount minus the matched commission.
+- Supplier types: direct purchase, line supply and recharge distributor.
+- Multiple collection agents can be assigned to a supplier; supplier payments can be linked to a purchase invoice or recorded against general distributor balance.
+- Repair job cards with device/model, optional IMEI/serial, reported issue, status, inventory components, part markup, service charges and internal overhead breakdown.
+- Customer and supplier collection ledgers, expense entry, operational reports and JSON backup/restore.
+- PWA manifest, service worker, offline shell and cached Lucide icon library.
 
 ## Run locally
-Serve this folder over HTTPS or localhost (service workers require a secure context):
+Serve over localhost or HTTPS (service workers require a secure context):
 ```bash
 python -m http.server 8000
 ```
 Open http://localhost:8000.
 
 ## Deploy with GitHub Pages
-Repository Settings → Pages → Deploy from a branch → main → / (root) → Save.
+Settings → Pages → Deploy from a branch → main → / (root).
 
-## Important
-This is the initial application foundation, not yet a complete production accounting ERP. The full double-entry ledger, stock costing, GST validation, returns, reconciliation, encrypted backups and comprehensive tests remain to be implemented before business-critical use. Data is local to this browser profile. Export backups frequently and keep copies elsewhere.
+## Important limitations
+- Recharge execution still happens in the external provider app. This ERP records the recharge and its accounting impact; automatic recharge execution needs a provider API.
+- Data is stored in the current browser profile on one device. There is no multi-device sync or cloud recovery.
+- The present screens provide operational accounting records, but the full double-entry posting engine, statutory GST invoice validation/filing, sales and purchase returns, complete IMEI-per-unit tracking, barcode/thermal printing, and final reconciled profit-and-loss reports still need to be completed and tested before production accounting use.
+- Export JSON backups regularly and keep copies outside the device. Restore replaces the current local data.
+
+Database schema version: 3.
