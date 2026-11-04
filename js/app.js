@@ -215,29 +215,67 @@ function productCard(product) {
 }
 function bindProductCards() {document.querySelectorAll("[data-edit-product]").forEach(button=>button.onclick=()=>openProductEditorById(button.dataset.editProduct));}
 async function openProductEditorById(id) {const products=await all("products");openProductEditor(products.find(row=>row.id===id));}
+function calculateSalePricePaise(costPaise, marginType, marginValue) {
+  const cost = Math.max(0, Math.round(Number(costPaise || 0)));
+  const value = Number(marginValue || 0);
+  const margin = marginType === "percentage"
+    ? Math.round(cost * value / 100)
+    : toPaise(value);
+  return Math.max(0, cost + margin);
+}
 function openProductEditor(product=null) {
-  const p=product||{productType:"accessory",qty:0,minStock:2,repairMarginType:"fixed",repairMarginValue:0};
+  const legacyMargin = product
+    ? (Number(product.pricePaise || 0) - Number(product.costPaise || 0)) / 100
+    : 0;
+  const p=product||{productType:"accessory",qty:0,minStock:2,repairMarginType:"fixed",repairMarginValue:0,saleMarginType:"percentage",saleMarginValue:0};
+  const saleMarginType=product?.saleMarginType||"fixed";
+  const saleMarginValue=product?.saleMarginValue ?? legacyMargin;
   const types=productTypes.map(row=>'<option value="'+row[0]+'">'+row[1]+'</option>').join("");
   const body='<div class="form-grid two"><div class="field"><label>Product type</label><select id="pType">'+types+'</select></div><div class="field"><label>Category</label><input id="pCategory" value="'+safe(p.category||"General")+'" placeholder="e.g. Chargers"></div></div>'+
     '<div class="field"><label>Product name *</label><input id="pName" value="'+safe(p.name||"")+'" placeholder="e.g. 25W fast charger" required></div>'+
     '<div class="form-grid two"><div class="field"><label>Brand</label><input id="pBrand" value="'+safe(p.brand||"")+'" placeholder="Brand"></div><div class="field"><label>Model / variant</label><input id="pModel" value="'+safe(p.model||"")+'" placeholder="Model"></div></div>'+
     '<div class="form-grid two"><div class="field"><label>SKU / barcode</label><input id="pSku" value="'+safe(p.sku||"")+'" placeholder="Optional code"></div><div class="field"><label>Unit</label><select id="pUnit"><option>Piece</option><option>Set</option><option>Box</option><option>Meter</option></select></div></div>'+
-    '<div class="form-grid two"><div class="field"><label>Purchase cost (₹)</label><input id="pCost" type="number" min="0" step="0.01" value="'+(Number(p.costPaise||0)/100)+'"></div><div class="field"><label>Selling price (₹)</label><input id="pPrice" type="number" min="0" step="0.01" value="'+(Number(p.pricePaise||0)/100)+'"></div></div>'+
+    '<div class="field"><label>Purchase cost per unit (₹)</label><input id="pCost" type="number" min="0" step="0.01" value="'+(Number(p.costPaise||0)/100)+'"></div>'+
+    '<div class="section-heading"><h2>Automatic sale price</h2></div><p class="inline-note">Set the profit markup once. Selling price is calculated from purchase cost and updates automatically when the purchase cost changes.</p>'+
+    '<div class="form-grid two"><div class="field"><label>Sale margin type</label><select id="saleMarginType"><option value="fixed">Fixed amount (₹)</option><option value="percentage">Percentage of purchase cost</option></select></div><div class="field"><label id="saleMarginLabel">Profit added (₹)</label><input id="saleMarginValue" type="number" step="0.01" value="'+Number(saleMarginValue||0)+'"></div></div>'+
+    '<div class="recharge-summary"><div class="summary-line"><span>Purchase cost</span><strong id="saleCostPreview">'+money(p.costPaise||0)+'</strong></div><div class="summary-line"><span>Profit added</span><strong id="saleProfitPreview">—</strong></div><div class="summary-line total"><span>Automatic selling price</span><strong id="salePricePreview">'+money(p.pricePaise||0)+'</strong></div></div>'+
+    '<input id="pPrice" type="hidden" value="'+Number(p.pricePaise||0)/100+'">'+
     '<div class="form-grid two"><div class="field"><label>Current stock</label><input id="pQty" type="number" min="0" step="1" value="'+Number(p.qty||0)+'"></div><div class="field"><label>Low-stock warning at</label><input id="pMin" type="number" min="0" step="1" value="'+Number(p.minStock??2)+'"></div></div>'+
-    '<div class="section-heading"><h2>Repair part pricing</h2></div><p class="inline-note">Used when this product is added as a component in a repair job. You can adjust the customer price on each repair.</p>'+
-    '<div class="form-grid two"><div class="field"><label>Default markup type</label><select id="pMarginType"><option value="fixed">Fixed margin (₹)</option><option value="percentage">Percentage markup</option></select></div><div class="field"><label>Default markup value</label><input id="pMarginValue" type="number" min="0" step="0.01" value="'+Number(p.repairMarginValue||0)+'"></div></div>';
+    '<div class="section-heading"><h2>Repair part pricing</h2></div><p class="inline-note">Separate from normal sale pricing. Used when this product is added as a component in a repair job.</p>'+
+    '<div class="form-grid two"><div class="field"><label>Repair markup type</label><select id="pMarginType"><option value="fixed">Fixed margin (₹)</option><option value="percentage">Percentage markup</option></select></div><div class="field"><label>Repair markup value</label><input id="pMarginValue" type="number" min="0" step="0.01" value="'+Number(p.repairMarginValue||0)+'"></div></div>';
   showModal(product?"Edit product":"Add product",body,async()=>{
     const name=$("#pName").value.trim();if(!name)throw Error("Product name is required.");
+    const costPaise=toPaise($("#pCost").value);
+    const saleMarginType=$("#saleMarginType").value;
+    const saleMarginValue=Number($("#saleMarginValue").value||0);
+    const pricePaise=calculateSalePricePaise(costPaise,saleMarginType,saleMarginValue);
     await saveProduct({
       id:product?.id,name,productType:$("#pType").value,category:$("#pCategory").value.trim()||"General",
       brand:$("#pBrand").value.trim(),model:$("#pModel").value.trim(),sku:$("#pSku").value.trim(),unit:$("#pUnit").value,
-      costPaise:toPaise($("#pCost").value),pricePaise:toPaise($("#pPrice").value),
+      costPaise,pricePaise,saleMarginType,saleMarginValue,
       qty:Number($("#pQty").value||0),minStock:Number($("#pMin").value||0),
       repairMarginType:$("#pMarginType").value,repairMarginValue:Number($("#pMarginValue").value||0)
     });
-    closeModal();toast(product?"Product updated.":"Product added to inventory.");await renderInventory();
+    closeModal();toast(product?"Product updated. Sale price recalculated.":"Product added with automatic sale price.");await renderInventory();
   },"PRODUCT CATALOGUE");
-  $("#pType").value=p.productType||"accessory";$("#pUnit").value=p.unit||"Piece";$("#pMarginType").value=p.repairMarginType||"fixed";
+  $("#pType").value=p.productType||"accessory";
+  $("#pUnit").value=p.unit||"Piece";
+  $("#pMarginType").value=p.repairMarginType||"fixed";
+  $("#saleMarginType").value=saleMarginType;
+  const updateSalePreview=()=>{
+    const cost=toPaise($("#pCost").value),type=$("#saleMarginType").value,value=Number($("#saleMarginValue").value||0);
+    const price=calculateSalePricePaise(cost,type,value);
+    const profit=price-cost;
+    $("#saleMarginLabel").textContent=type==="fixed"?"Profit added per unit (₹)":"Markup on purchase cost (%)";
+    $("#saleCostPreview").textContent=money(cost);
+    $("#saleProfitPreview").textContent=money(profit);
+    $("#salePricePreview").textContent=money(price);
+    $("#pPrice").value=(price/100).toFixed(2);
+  };
+  $("#pCost").oninput=updateSalePreview;
+  $("#saleMarginType").onchange=updateSalePreview;
+  $("#saleMarginValue").oninput=updateSalePreview;
+  updateSalePreview();
 }
 async function openReorderModal(low,suppliers) {
   const validSuppliers=suppliers.filter(row=>row.supplierType!=="recharge_distributor");
