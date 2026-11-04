@@ -1,0 +1,18 @@
+{
+  "name": "Mobile Shop ERP",
+  "short_name": "Shop ERP",
+  "description": "Offline-first mobile shop business management",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f5f8f6",
+  "theme_color": "#087f5b",
+  "icons": [
+    {
+      "src": "./assets/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
