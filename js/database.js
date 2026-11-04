@@ -209,10 +209,15 @@ export async function saveRechargeProvider(data) {
 }
 
 function resolveCommission(provider, amountPaise) {
-  const rules = (provider.amountRules || []).filter(rule => rule.active !== false).slice().sort((a,b) => Number(a.minAmountPaise || 0) - Number(b.minAmountPaise || 0));
+  const rules = (provider.amountRules || []).filter(rule => rule.active !== false).slice().sort((a,b) => {
+    const aMin=Number(a.minAmountPaise||0), bMin=Number(b.minAmountPaise||0);
+    const aMax=a.maxAmountPaise==null||a.maxAmountPaise===""?aMin:Number(a.maxAmountPaise);
+    const bMax=b.maxAmountPaise==null||b.maxAmountPaise===""?bMin:Number(b.maxAmountPaise);
+    return (aMax-aMin)-(bMax-bMin);
+  });
   const matched = rules.find(rule => {
     const min = Number(rule.minAmountPaise || 0);
-    const max = rule.maxAmountPaise == null || rule.maxAmountPaise === "" ? Infinity : Number(rule.maxAmountPaise);
+    const max = rule.maxAmountPaise == null || rule.maxAmountPaise === "" ? min : Number(rule.maxAmountPaise);
     return amountPaise >= min && amountPaise <= max;
   });
   const type = matched?.commissionType || provider.commissionType || "percentage";
@@ -503,6 +508,16 @@ export async function addRepairService({repairJobId,description,customerChargePa
   const internalCostPaise=Object.values(costBreakdown).reduce((sum,value)=>sum+Math.max(0,Math.round(Number(value||0))),0);
   const row={id:uid(),repairJobId,description:String(description||"Repair service").trim(),customerChargePaise:charge,costBreakdown,internalCostPaise,createdAt:new Date().toISOString()};
   await add("repair_job_services",row);return row;
+}
+
+export async function recordRepairPayment({repairJobId,customerId=null,amountPaise,paymentMethod="Cash",note=""}) {
+  const amount=Math.round(Number(amountPaise));
+  if(!Number.isSafeInteger(amount)||amount<=0)throw new Error("Enter a valid repair payment.");
+  const database=await db(),now=new Date().toISOString(),id=uid();
+  const payment={id,repairJobId,customerId,amountPaise:amount,paymentMethod,note,createdAt:now};
+  await add("repair_payments",payment);
+  await add("payments",{...payment,direction:"in",partyType:"repair",partyId:customerId});
+  return payment;
 }
 
 export async function exportAll() {
