@@ -269,9 +269,13 @@ export async function topupRechargeWallet({ providerId, amountPaise, supplierId 
     };
     providerReq.onsuccess=()=>{provider=providerReq.result;pReady=true;apply();};
     walletReq.onsuccess=()=>{wallet=walletReq.result;wReady=true;apply();};
-    const actualSupplierId = supplierId;
-    const supplierReq = tx.objectStore("suppliers").get(actualSupplierId);
-    supplierReq.onsuccess=()=>{supplier=supplierReq.result;sReady=true;apply();};
+    if (supplierId) {
+      const supplierReq = tx.objectStore("suppliers").get(supplierId);
+      supplierReq.onsuccess=()=>{supplier=supplierReq.result;sReady=true;apply();};
+    } else {
+      sReady = true;
+      apply();
+    }
     tx.oncomplete=()=>resolve(result);
     tx.onerror=()=>reject(failure || tx.error);
     tx.onabort=()=>reject(failure || tx.error || new Error("Wallet credit failed."));
