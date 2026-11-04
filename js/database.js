@@ -200,7 +200,7 @@ function calculateRecharge(provider, faceValuePaise) {
     walletDebitPaise = amount - commissionPaise;
   }
 
-  if (commissionPaise < 0 || walletDebitPaise < 0) throw new Error("Provider rules produce a negative amount.");
+  if (commissionPaise < 0 || commissionPaise > amount || walletDebitPaise < 0) throw new Error("Provider rules produce an invalid commission or deduction.");
   if (walletDebitPaise > amount * 5) throw new Error("Configured wallet deduction looks too high. Check provider settings.");
   return { commissionPaise, walletDebitPaise };
 }
