@@ -989,12 +989,71 @@ function toggleTheme() {
   localStorage.setItem("mobile-shop-theme",document.body.classList.contains("theme-dark")?"dark":"light");
   refreshIcons();
 }
-async function installApp() {
-  if(!installPrompt){toast("Use the browser menu → Install app / Add to Home Screen.");return;}
-  installPrompt.prompt();await installPrompt.userChoice;installPrompt=null;
+function isAppInstalled() {
+  return window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone === true;
 }
+function installInstructions() {
+  const ua=navigator.userAgent||"";
+  const isIOS=/iPad|iPhone|iPod/.test(ua)||(navigator.platform==="MacIntel"&&navigator.maxTouchPoints>1);
+  const isAndroid=/Android/i.test(ua);
+  if(isIOS) return /CriOS|FxiOS|EdgiOS/i.test(ua)
+    ? "Open this page in Safari. Tap the Share icon, choose “Add to Home Screen”, then tap Add."
+    : "In Safari, tap the Share icon at the bottom, choose “Add to Home Screen”, then tap Add.";
+  if(isAndroid) return "In Chrome, tap the ⋮ menu and choose “Install app” or “Add to Home screen”. Confirm the prompt to add Mobile Shop.";
+  return "In Chrome or Edge, use the Install icon in the address bar, or open the browser menu and choose “Install Mobile Shop”.";
+}
+function showInstallDialog(force=false) {
+  const dialog=$("#installDialog");
+  if(!dialog||isAppInstalled()) return;
+  const dismissedUntil=Number(localStorage.getItem("mobile-shop-install-dismissed-until")||0);
+  if(!force&&dismissedUntil>Date.now()) return;
+  $("#installDialogMessage").textContent=installPrompt
+    ? "Install Mobile Shop on this device for one-tap access and a clean app-like experience. Your shop data stays saved on this device."
+    : installInstructions();
+  $("#installAction").textContent=installPrompt?"Install app":"Got it";
+  if(!dialog.open) dialog.showModal();
+  refreshIcons();
+}
+function closeInstallDialog(snooze=true) {
+  const dialog=$("#installDialog");
+  if(dialog?.open) dialog.close();
+  if(snooze) localStorage.setItem("mobile-shop-install-dismissed-until",String(Date.now()+7*24*60*60*1000));
+}
+async function handleInstallAction() {
+  if(!installPrompt) { closeInstallDialog(false); return; }
+  const promptEvent=installPrompt;
+  installPrompt=null;
+  try {
+    await promptEvent.prompt();
+    const choice=await promptEvent.userChoice;
+    if(choice?.outcome==="accepted") toast("Mobile Shop installation started.");
+    else localStorage.setItem("mobile-shop-install-dismissed-until",String(Date.now()+7*24*60*60*1000));
+  } catch(error) {
+    toast("Use your browser menu to install Mobile Shop.");
+  }
+  const dialog=$("#installDialog");
+  if(dialog?.open) dialog.close();
+}
+async function installApp() { showInstallDialog(true); }
+$("#installAction").onclick=handleInstallAction;
+$("#installLater").onclick=()=>closeInstallDialog(true);
+$("#installDialogClose").onclick=()=>closeInstallDialog(true);
+$("#installDialog").addEventListener("click",event=>{if(event.target===$("#installDialog"))closeInstallDialog(true);});
+$("#installDialog").addEventListener("cancel",()=>closeInstallDialog(true));
 $("#themeBtn").onclick=toggleTheme;
 if(localStorage.getItem("mobile-shop-theme")==="dark")document.body.classList.add("theme-dark");
-window.addEventListener("beforeinstallprompt",event=>{event.preventDefault();installPrompt=event;});
+window.addEventListener("beforeinstallprompt",event=>{
+  event.preventDefault();
+  installPrompt=event;
+  if($("#installDialog")?.open) showInstallDialog(true);
+});
+window.addEventListener("appinstalled",()=>{
+  installPrompt=null;
+  localStorage.removeItem("mobile-shop-install-dismissed-until");
+  const dialog=$("#installDialog");
+  if(dialog?.open) dialog.close();
+  toast("Mobile Shop is installed on this device.");
+});
+setTimeout(()=>showInstallDialog(),1800);
 if("serviceWorker"in navigator)window.addEventListener("load",()=>navigator.serviceWorker.register("./sw.js").catch(error=>console.warn("Offline setup:",error)));
 render().catch(error=>{console.error(error);$("#view").innerHTML='<div class="card empty-state">Could not open the local database. Reload the app or close other app tabs. '+safe(error.message)+'</div>';});
