@@ -1,4 +1,4 @@
-const CACHE_NAME = "mobile-shop-erp-v3";
+const CACHE_NAME = "mobile-shop-erp-v5";
 const ICON_LIBRARY = "https://unpkg.com/lucide@0.468.0/dist/umd/lucide.js";
 const APP_FILES = [
   "./",
