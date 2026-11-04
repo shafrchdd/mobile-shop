@@ -537,22 +537,25 @@ async function renderCollections() {
   refreshIcons();
 }
 async function openCollectionModal(preselectedSupplierId=null) {
-  const [suppliers,agents,links,ledger]=await Promise.all([all("suppliers"),all("collection_agents"),all("supplier_agent_links"),all("supplier_ledger_entries")]);
+  const [suppliers,agents,links,ledger,purchases]=await Promise.all([all("suppliers"),all("collection_agents"),all("supplier_agent_links"),all("supplier_ledger_entries"),all("purchases")]);
   const active=suppliers.filter(s=>s.supplierType!=="direct_purchase"||ledger.some(e=>e.supplierId===s.id));
   const body='<div class="field"><label>Supplier / distributor *</label><select id="collectionSupplier"><option value="">Select supplier</option>'+active.map(s=>'<option value="'+safe(s.id)+'">'+safe(s.name)+' · '+safe(supplierTypeLabel(s.supplierType))+'</option>').join("")+'</select></div>'+
+    '<div class="field"><label>Apply payment to invoice (optional)</label><select id="collectionPurchase"><option value="">General supplier balance / recharge wallet credit</option></select><span class="field-hint">Choose a purchase invoice to update its paid / outstanding status. Leave blank for a recharge wallet credit or general supplier settlement.</span></div>'+
     '<div class="field"><label>Collection agent (optional)</label><select id="collectionAgent"><option value="">Direct supplier payment / no agent</option></select><span class="field-hint">Only agents linked to the selected supplier are shown.</span></div>'+
     '<div class="field"><label>Amount paid / collected (₹) *</label><input id="collectionAmount" type="number" inputmode="decimal" min="0.01" step="0.01" placeholder="0.00"></div>'+
     '<div class="field"><label>Payment method</label><select id="collectionMethod"><option>Cash</option><option>UPI</option><option>Bank</option><option>Card</option></select></div>'+
     '<div class="field"><label>Note (optional)</label><input id="collectionNote" placeholder="e.g. Agent visited today"></div>'+
     '<p class="inline-note" id="collectionBalance"></p>';
   showModal("Record supplier payment",body,async()=>{
-    const supplierId=$("#collectionSupplier").value,amount=toPaise($("#collectionAmount").value),agentId=$("#collectionAgent").value||null;
+    const supplierId=$("#collectionSupplier").value,amount=toPaise($("#collectionAmount").value),agentId=$("#collectionAgent").value||null,purchaseId=$("#collectionPurchase").value||null;
     if(!supplierId)throw Error("Select a supplier.");
     if(amount<=0)throw Error("Enter a valid amount.");
     const balance=ledger.filter(row=>row.supplierId===supplierId).reduce((sum,row)=>sum+Number(row.balanceDeltaPaise||0),0);
     if(balance>0&&amount>balance)throw Error("Amount exceeds current supplier outstanding of "+money(balance)+".");
     if(agentId&&!links.some(link=>link.supplierId===supplierId&&link.agentId===agentId))throw Error("Selected agent is not assigned to this supplier.");
-    await recordSupplierPayment({supplierId,amountPaise:amount,paymentMethod:$("#collectionMethod").value,agentId,note:$("#collectionNote").value.trim()});
+    const note=$("#collectionNote").value.trim(),paymentMethod=$("#collectionMethod").value;
+    if(purchaseId)await recordPurchasePayment({purchaseId,supplierId,amountPaise:amount,paymentMethod,agentId,note});
+    else await recordSupplierPayment({supplierId,amountPaise:amount,paymentMethod,agentId,note});
     closeModal();toast("Supplier payment saved"+(agentId?" with agent tracking.":"."));await renderCollections();
   },"SUPPLIER SETTLEMENT","Save payment");
   $("#collectionSupplier").value=preselectedSupplierId||"";
@@ -561,8 +564,10 @@ async function openCollectionModal(preselectedSupplierId=null) {
     const agentIds=links.filter(row=>row.supplierId===supplierId).map(row=>row.agentId);
     const options=agents.filter(agent=>agentIds.includes(agent.id));
     $("#collectionAgent").innerHTML='<option value="">Direct supplier payment / no agent</option>'+options.map(agent=>'<option value="'+safe(agent.id)+'">'+safe(agent.name)+'</option>').join("");
+    const open=purchases.filter(row=>row.supplierId===supplierId&&Number(row.duePaise||0)>0);
+    $("#collectionPurchase").innerHTML='<option value="">General supplier balance / recharge wallet credit</option>'+open.map(row=>'<option value="'+safe(row.id)+'">'+safe(row.invoiceNumber||"Purchase")+' · Due '+money(row.duePaise)+'</option>').join("");
     const balance=ledger.filter(row=>row.supplierId===supplierId).reduce((sum,row)=>sum+Number(row.balanceDeltaPaise||0),0);
-    $("#collectionBalance").textContent=supplierId?"Current outstanding: "+money(balance):"Select a supplier to view outstanding.";
+    $("#collectionBalance").textContent=supplierId?"Current supplier outstanding: "+money(balance):"Select a supplier to view outstanding.";
   };
   $("#collectionSupplier").onchange=updateAgents;updateAgents();
 }
