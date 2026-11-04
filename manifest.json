@@ -1,18 +1,51 @@
 {
+  "id": "./",
   "name": "Mobile Shop ERP",
   "short_name": "Shop ERP",
-  "description": "Offline-first mobile shop business management",
+  "description": "Mobile-first offline-ready Kerala mobile shop management",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
-  "background_color": "#f5f8f6",
+  "orientation": "portrait-primary",
+  "background_color": "#f4f7f5",
   "theme_color": "#087f5b",
+  "categories": [
+    "business",
+    "finance",
+    "productivity"
+  ],
   "icons": [
     {
       "src": "./assets/icon.svg",
       "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Quick Recharge",
+      "short_name": "Recharge",
+      "url": "./?page=recharge",
+      "icons": [
+        {
+          "src": "./assets/icon.svg",
+          "sizes": "any",
+          "type": "image/svg+xml"
+        }
+      ]
+    },
+    {
+      "name": "New Sale",
+      "short_name": "New Sale",
+      "url": "./?page=sales",
+      "icons": [
+        {
+          "src": "./assets/icon.svg",
+          "sizes": "any",
+          "type": "image/svg+xml"
+        }
+      ]
     }
   ]
 }
