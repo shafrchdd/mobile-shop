@@ -24,7 +24,8 @@ const mobileItems = [
   ["repairs","Repairs","wrench"],
   ["more","More","grid-2x2"]
 ];
-let current = "home";
+const requestedPage = new URLSearchParams(location.search).get("page");
+let current = navItems.some(item => item[0] === requestedPage) || ["providers","more","expenses"].includes(requestedPage) ? requestedPage : "home";
 let rechargeService = "mobile";
 let installPrompt = null;
 
