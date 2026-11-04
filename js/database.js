@@ -85,6 +85,13 @@ export async function count(storeName) {
   });
 }
 
+function calculateProductSalePricePaise(costPaise, marginType, marginValue) {
+  const cost = Math.max(0, Math.round(Number(costPaise || 0)));
+  const value = Number(marginValue || 0);
+  const margin = marginType === "percentage" ? Math.round(cost * value / 100) : Math.round(value * 100);
+  return Math.max(0, cost + margin);
+}
+
 export async function saveProduct(data) {
   const database = await db();
   const id = data.id || uid();
@@ -105,6 +112,9 @@ export async function saveProduct(data) {
         category: String(data.category || "General").trim(),
         qty, updatedAt: now, createdAt: old?.createdAt || now
       };
+      if (saved.saleMarginType === "fixed" || saved.saleMarginType === "percentage") {
+        saved.pricePaise = calculateProductSalePricePaise(saved.costPaise, saved.saleMarginType, saved.saleMarginValue);
+      }
       if (!saved.name) { failure = new Error("Product name is required."); tx.abort(); return; }
       products.put(saved);
       const oldQty = Number(old?.qty || 0);
@@ -354,7 +364,11 @@ export async function recordPurchase({ supplierId=null, purchaseType="line_suppl
           const oldQty=Number(product.qty||0),newQty=oldQty+item.quantity;
           const oldCost=Number(product.costPaise||0);
           const weightedCost=newQty>0?Math.round((oldQty*oldCost+item.quantity*item.unitCostPaise)/newQty):item.unitCostPaise;
-          product.qty=newQty;product.costPaise=weightedCost;product.updatedAt=now;products.put(product);
+          product.qty=newQty;product.costPaise=weightedCost;
+          if (product.saleMarginType === "fixed" || product.saleMarginType === "percentage") {
+            product.pricePaise = calculateProductSalePricePaise(weightedCost, product.saleMarginType, product.saleMarginValue);
+          }
+          product.updatedAt=now;products.put(product);
           const purchaseItem={id:uid(),purchaseId:id,productId,productName:product.name,quantity:item.quantity,unitCostPaise:item.unitCostPaise,lineTotalPaise:item.lineTotalPaise};
           tx.objectStore("purchase_items").add(purchaseItem);
           tx.objectStore("stock_movements").add({id:uid(),productId,productName:product.name,movementType:"PURCHASE",quantityDelta:item.quantity,balanceAfter:newQty,referenceId:id,note:"Purchase stock received",createdAt:now});
