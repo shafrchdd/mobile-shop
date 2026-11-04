@@ -293,7 +293,7 @@ async function renderProviders() {
       const wallet = walletMap.get(provider.id);
       return '<article class="card provider-card"><div class="provider-top"><span class="provider-logo">' + icon("radio-tower") + '</span><div class="provider-info"><h3>' + safe(provider.name) + '</h3><p>' + (provider.active === false ? '<span class="pill danger">Inactive</span>' : '<span class="pill">Active</span>') + '</p></div></div>' +
         '<div class="provider-balance">' + money(wallet ? wallet.balancePaise : 0) + '</div><div class="provider-meta">Available provider wallet balance<br>' + safe(providerRuleText(provider)) + '</div>' +
-        '<div class="provider-actions"><button class="btn btn-secondary btn-sm" type="button" data-topup="' + safe(provider.id) '">' + icon("plus-circle") + ' Add balance</button><button class="btn btn-quiet btn-sm" type="button" data-edit-provider="' + safe(provider.id) + '">' + icon("pencil") + ' Edit rules</button></div></article>';
+        '<div class="provider-actions"><button class="btn btn-secondary btn-sm" type="button" data-topup="' + safe(provider.id) + '">' + icon("plus-circle") + ' Add balance</button><button class="btn btn-quiet btn-sm" type="button" data-edit-provider="' + safe(provider.id) + '">' + icon("pencil") + ' Edit rules</button></div></article>';
     }).join("") + '</div>';
   }
   $("#view").innerHTML = html;
