@@ -401,7 +401,7 @@ async function openPurchaseModal() {
   const [products,suppliers]=await Promise.all([all("products"),all("suppliers")]);
   if(!products.length){toast("Create products before receiving purchases.");return;}
   purchaseCart=[{productId:"",quantity:1,unitCostPaise:0}];
-  const body='<div class="field"><label>Purchase supplier</label><select id="buySupplier"><option value="">Select supplier / direct cash purchase</option>'+suppliers.map(s=>'<option value="'+safe(s.id)+'">'+safe(s.name)+' · '+safe(s.supplierType.replaceAll("_"," "))+'</option>').join("")+'</select></div>'+
+  const body='<div class="field"><label>Purchase supplier</label><select id="buySupplier"><option value="">Select supplier / direct cash purchase</option>'+suppliers.map(s=>'<option value="'+safe(s.id)+'">'+safe(s.name)+' · '+safe(supplierTypeLabel(s.supplierType))+'</option>').join("")+'</select></div>'+
     '<div class="form-grid two"><div class="field"><label>Purchase type</label><select id="buyType"><option value="line_supply">Line supply / credit</option><option value="direct_market">Direct market purchase</option></select></div><div class="field"><label>Supplier invoice number</label><input id="buyInvoice" placeholder="Optional invoice no."></div></div>'+
     '<div class="section-heading"><h2>Items supplied</h2><span class="tiny">Stock increases on save</span></div><div id="buyRows"></div><button id="addBuyLine" type="button" class="btn btn-secondary btn-sm">'+icon("plus")+' Add product line</button>'+
     '<div class="recharge-summary" style="margin-top:14px"><div class="summary-line"><span>Purchase total</span><strong id="buyTotal">₹0.00</strong></div></div>'+
@@ -415,7 +415,9 @@ async function openPurchaseModal() {
     const total=items.reduce((sum,row)=>sum+Number(row.quantity||0)*Number(row.unitCostPaise||0),0);
     const paid=toPaise($("#buyPaid").value);
     if(paid>total)throw Error("Paid amount cannot exceed purchase total.");
-    await recordPurchase({supplierId,purchaseType:$("#buyType").value,invoiceNumber:$("#buyInvoice").value.trim(),items,payments:paid?[{amountPaise:paid,paymentMethod:$("#buyMethod").value}]:[]});
+    const grouped=new Map();
+    for(const row of items){if(grouped.has(row.productId)){const previous=grouped.get(row.productId);if(previous.unitCostPaise!==row.unitCostPaise)throw Error("A product appears twice with different purchase costs. Use one line per product.");previous.quantity+=Number(row.quantity);}else grouped.set(row.productId,{...row,quantity:Number(row.quantity)});}
+    await recordPurchase({supplierId,purchaseType:$("#buyType").value,invoiceNumber:$("#buyInvoice").value.trim(),items:[...grouped.values()],payments:paid?[{amountPaise:paid,paymentMethod:$("#buyMethod").value}]:[]});
     closeModal();toast("Purchase saved. Stock quantities increased.");await renderPurchases();
   },"PURCHASE RECEIVING","Save purchase");
   const draw=()=>{
