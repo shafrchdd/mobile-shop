@@ -48,6 +48,22 @@
   <nav class="mobile-nav" id="mobileNav" aria-label="Main navigation"></nav>
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
+  <dialog id="installDialog" class="install-dialog" aria-labelledby="installDialogTitle">
+    <div class="install-dialog-top">
+      <span class="install-dialog-icon"><i data-lucide="smartphone"></i></span>
+      <button class="icon-btn" id="installDialogClose" type="button" aria-label="Close install prompt"><i data-lucide="x"></i></button>
+    </div>
+    <div class="install-dialog-copy">
+      <div class="install-dialog-kicker">QUICK ACCESS · WORKS OFFLINE</div>
+      <h2 id="installDialogTitle">Install Mobile Shop</h2>
+      <p id="installDialogMessage">Add the app to your home screen for a faster, app-like experience.</p>
+    </div>
+    <div class="install-dialog-actions">
+      <button class="btn btn-quiet" id="installLater" type="button">Not now</button>
+      <button class="btn btn-primary" id="installAction" type="button">Install app</button>
+    </div>
+  </dialog>
+
   <dialog id="modal" class="app-modal">
     <form id="modalForm" autocomplete="off">
       <div class="modal-head"><div><div class="modal-kicker" id="modalKicker">DETAILS</div><h2 id="modalTitle"></h2></div><button class="icon-btn" type="button" id="modalClose" aria-label="Close"><i data-lucide="x"></i></button></div>
