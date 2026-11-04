@@ -251,7 +251,8 @@ async function openReorderModal(low,suppliers) {
     }).filter(row=>row.quantity>0);
     if(!selected.length)throw Error("Select at least one product and quantity.");
     const textLines=["Hello "+(supplier?.name||"")+", please supply these items:",...selected.map(row=>row.productName+" - "+row.quantity+" pcs"),"Thank you."];
-    const phone=digits(supplier?.phone||"");
+    let phone=digits(supplier?.phone||"");
+    if(phone.length===10)phone="91"+phone;
     const waUrl=phone?"https://wa.me/"+phone+"?text="+encodeURIComponent(textLines.join("\n")):null;
     if(waUrl)window.open(waUrl,"_blank","noopener,noreferrer");
     await add("reorder_requests",{id:uid(),supplierId:supplier?.id||null,items:selected,status:"sent_to_whatsapp",createdAt:new Date().toISOString()});
@@ -446,12 +447,12 @@ async function supplierBalance(supplierId) {
 }
 async function renderSuppliers() {
   setTitle("Suppliers");
-  const [suppliers,agents,ledger]=await Promise.all([all("suppliers"),all("collection_agents"),all("supplier_ledger_entries")]);
+  const [suppliers,agents,ledger,links]=await Promise.all([all("suppliers"),all("collection_agents"),all("supplier_ledger_entries"),all("supplier_agent_links")]);
   let html='<div class="page-intro"><div><h2>Suppliers</h2><p>Direct purchase, line supply and recharge distributors have different collection workflows.</p></div><button class="btn btn-primary" id="addSupplier">'+icon("plus")+'<span class="desktop-only">Add supplier</span></button></div>';
   html+='<div class="settings-grid">'+suppliers.map(supplier=>{
     const due=ledger.filter(row=>row.supplierId===supplier.id).reduce((sum,row)=>sum+Number(row.balanceDeltaPaise||0),0);
-    const linked=agents.filter(agent=>false);
-    return '<article class="card provider-card"><div class="provider-top"><span class="provider-logo">'+icon(supplier.supplierType==="recharge_distributor"?"radio-tower":supplier.supplierType==="line_supply"?"truck":"store")+'</span><div class="provider-info"><h3>'+safe(supplier.name)+'</h3><p>'+safe(supplierTypeLabel(supplier.supplierType))+'</p></div></div><div class="provider-balance">'+money(due)+'</div><div class="provider-meta">'+safe(supplier.phone||"No contact number")+'<br>'+safe(supplier.address||"Address not added")+'<br>'+((supplier.agentIds||[]).length||"No")+' collection agent links</div><div class="provider-actions"><button class="btn btn-secondary btn-sm" data-supplier-edit="'+safe(supplier.id)+'">'+icon("pencil")+' Edit</button><button class="btn btn-quiet btn-sm" data-supplier-pay="'+safe(supplier.id)+'">'+icon("wallet")+' Collect / pay</button></div></article>';
+    const linked=agents.filter(agent=>links.some(link=>link.supplierId===supplier.id&&link.agentId===agent.id));
+    return '<article class="card provider-card"><div class="provider-top"><span class="provider-logo">'+icon(supplier.supplierType==="recharge_distributor"?"radio-tower":supplier.supplierType==="line_supply"?"truck":"store")+'</span><div class="provider-info"><h3>'+safe(supplier.name)+'</h3><p>'+safe(supplierTypeLabel(supplier.supplierType))+'</p></div></div><div class="provider-balance">'+money(due)+'</div><div class="provider-meta">'+safe(supplier.phone||"No contact number")+'<br>'+safe(supplier.address||"Address not added")+'<br>'+(supplier.supplierType==="direct_purchase"?"No":linked.length)+' collection agent links</div><div class="provider-actions"><button class="btn btn-secondary btn-sm" data-supplier-edit="'+safe(supplier.id)+'">'+icon("pencil")+' Edit</button><button class="btn btn-quiet btn-sm" data-supplier-pay="'+safe(supplier.id)+'">'+icon("wallet")+' Collect / pay</button></div></article>';
   }).join("")+'</div>';
   if(!suppliers.length)html+='<div class="card provider-empty"><span class="empty-icon">'+icon("store")+'</span><h3>No suppliers yet</h3><p>Add suppliers so line purchases, recharge distributor credits and collection agents stay connected.</p><button class="btn btn-primary" id="addSupplierEmpty">'+icon("plus")+' Add supplier</button></div>';
   $("#view").innerHTML=html;
@@ -574,7 +575,7 @@ async function renderRecharge() {
     html+='<div class="wallet-mini-grid" style="margin-bottom:13px"><div class="wallet-mini"><small>Total available wallet</small><strong>'+money(walletTotal)+'</strong></div><div class="wallet-mini"><small>Today commission</small><strong>'+money(totalBy(todayRows,"commissionPaise"))+'</strong></div></div>';
     html+='<div class="recharge-layout"><section class="card recharge-card"><div class="service-switch"><button type="button" class="service-option '+(rechargeService==="mobile"?"active":"")+'" data-service="mobile">'+icon("smartphone")+' Mobile</button><button type="button" class="service-option '+(rechargeService==="dth"?"active":"")+'" data-service="dth">'+icon("tv")+' DTH</button><button type="button" class="service-option '+(rechargeService==="other"?"active":"")+'" data-service="other">'+icon("zap")+' Other</button></div>';
     html+='<form id="rechargeForm"><div class="field"><label>Recharge provider</label><select id="rechargeProvider">'+active.map(p=>'<option value="'+safe(p.id)+'">'+safe(p.name)+'</option>').join("")+'</select></div>'+
-      '<div class="field"><label id="recipientLabel">Mobile number</label><input id="rechargeRecipient" type="tel" inputmode="numeric" maxlength="10" placeholder="10-digit mobile number" required><span class="field-hint" id="recipientHint">Required for mobile recharge.</span></div>'+
+      '<div class="field"><label id="recipientLabel">Mobile number</label><input id="rechargeRecipient" type="tel" inputmode="numeric" maxlength="10" placeholder="10-digit mobile number" required><span class="field-hint" id="recipientHint">Required for mobile recharge.</span></div>'+ '<div class="field"><label for="rechargeCustomerName">Customer name (new contact)</label><input id="rechargeCustomerName" type="text" placeholder="Enter only for a new customer"><span class="field-hint" id="rechargeCustomerMatch">Existing customer will be linked automatically by phone number.</span></div>'+
       '<div class="field"><label>Recharge amount (₹)</label><div class="amount-field"><span class="currency">₹</span><input id="rechargeAmount" type="number" inputmode="decimal" min="1" step="0.01" placeholder="0.00" required></div></div>'+
       '<div class="recharge-summary" id="rechargePreview"><div class="summary-line"><span>Commission earned</span><strong>—</strong></div><div class="summary-line"><span>Wallet deduction</span><strong>—</strong></div><div class="summary-line total"><span>Balance after recharge</span><strong>—</strong></div></div>'+
       '<button type="submit" class="btn btn-primary btn-block" id="rechargeSubmit">'+icon("check-circle")+' Record recharge</button><p class="recharge-submit-note">Wallet deduction = recharge amount − commission. Complete the actual recharge in your provider app.</p></form></section>';
@@ -587,7 +588,8 @@ async function renderRecharge() {
   refreshIcons();
 }
 function bindRecharge(active,walletMap) {
-  const providerSelect=$("#rechargeProvider"),amountInput=$("#rechargeAmount"),recipient=$("#rechargeRecipient");
+  const providerSelect=$("#rechargeProvider"),amountInput=$("#rechargeAmount"),recipient=$("#rechargeRecipient"),customerNameInput=$("#rechargeCustomerName");
+  recipient.addEventListener("input",async()=>{const phone=normalizePhone(recipient.value);if(phone.length!==10){$("#rechargeCustomerMatch").textContent="Existing customer will be linked automatically by phone number.";return;}const customers=await all("customers"),match=customers.find(row=>normalizePhone(row.phone)===phone);if(match){customerNameInput.value=match.name||"";customerNameInput.dataset.customerId=match.id;$("#rechargeCustomerMatch").textContent="✓ Existing customer: "+(match.name||"Saved customer");}else{$("#rechargeCustomerMatch").textContent="New number. Add a name to save this customer contact.";customerNameInput.dataset.customerId="";}});
   const updateService=()=>{
     document.querySelectorAll("[data-service]").forEach(button=>button.classList.toggle("active",button.dataset.service===rechargeService));
     if(rechargeService==="mobile"){recipient.type="tel";recipient.inputMode="numeric";recipient.maxLength=10;recipient.placeholder="10-digit mobile number";recipient.required=true;$("#recipientLabel").textContent="Mobile number";$("#recipientHint").textContent="Required for mobile recharge.";}
@@ -611,7 +613,7 @@ function bindRecharge(active,walletMap) {
     if(!amount||amount<=0)throw new Error("Enter a valid recharge amount.");
     if(rechargeService==="mobile"&&digits(recipientValue).length!==10)throw new Error("Enter a valid 10-digit mobile number.");
     let customerId=null;
-    if(digits(recipientValue).length===10)customerId=await resolveCustomer("",recipientValue);
+    if(digits(recipientValue).length===10)customerId=await resolveCustomer(customerNameInput.value.trim(),recipientValue);
     try {
       $("#rechargeSubmit").disabled=true;
       const result=await completeRecharge({providerId,serviceType:rechargeService,recipient:recipientValue,customerId,amountPaise:amount});
